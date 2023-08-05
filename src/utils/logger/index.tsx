@@ -8,11 +8,11 @@ type LoggerContextType = {
 };
 export const LoggerContext = React.createContext<LoggerContextType>({
   write: (_: LogState) => {},
-  clear: () => {}
+  clear: () => {},
 });
 export const useLogger = () => React.useContext(LoggerContext);
 
-export const LoggerProvider: React.FC = ({ children }) => {
+export const LoggerProvider: FCC = ({ children }) => {
   const [logs, setLogs] = React.useState<LogState[]>([]);
 
   const contextValue = React.useMemo<LoggerContextType>(
@@ -20,7 +20,7 @@ export const LoggerProvider: React.FC = ({ children }) => {
       write: (log: LogState) => {
         setLogs((state) => [...state, log]);
       },
-      clear: () => setLogs([])
+      clear: () => setLogs([]),
     }),
     []
   );
@@ -30,11 +30,12 @@ export const LoggerProvider: React.FC = ({ children }) => {
       <LoggerContext.Provider value={contextValue}>
         <div
           style={{
-            margin: "5px",
+            padding: "5px",
             position: "fixed",
+            background: "rgba(27, 160, 220, 0.45)",
             bottom: 0,
             left: 0,
-            right: 0
+            right: 0,
           }}
         >
           <LogClear />

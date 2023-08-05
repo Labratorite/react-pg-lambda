@@ -1,5 +1,6 @@
 import React from "react";
-import { useForm, FormProvider, useWatch } from "react-hook-form";
+import { useNavigate } from "react-router-dom";
+import { FormProvider, SubmitHandler, useForm } from "react-hook-form";
 
 import styled from "@emotion/styled";
 import { DateTime } from "luxon";
@@ -8,51 +9,48 @@ import { Box } from "@mui/material";
 import { useLogger } from "src/utils/logger";
 import useLambdaRequest from "src/utils/LambdaRequest";
 import PostTable from "./PostTable";
-import AddPostButton from "./PostEditor";
+import TargetableButton from "./TargetableButton";
+import OpenEditorDialogButton from "./PostEditor";
 
-const url = "https://azyxtmgvfb.execute-api.ap-northeast-1.amazonaws.com";
-
-const generatePost = (id: string): Post => {
+export const generatePost = (values?: Partial<Post>): Post => {
+  const id = DateTime.local().toMillis().toString();
   return {
-    id: DateTime.local().toMillis().toString(),
+    id: id,
     _type: "post",
     parent_id: "post",
     title: "title_" + id,
     author: "nanashi",
-    content: "honn"
+    content: "content",
+    ...values,
   };
 };
 
-const TargetableButton = (props: ButtonProps): JSX.Element | null => {
-  const { children, ...rest } = props;
-  const selected = useWatch<HookForm>({ name: "_selectedPost" });
-  return (
-    <MuiButton size="small" variant="outlined" disabled={!selected} {...rest}>
-      {children}
-    </MuiButton>
-  );
-};
-
+/*
 const ActionButton = styled.div((props) => {
   console.log("props", props);
   return {
-    display: "flex"
+    display: "flex",
   };
 });
+*/
 
 const PostCrudCommponent: React.FC = () => {
   const logger = useLogger();
   console.log("PostCrudCommponent");
-  //logger.write({ component: "TryLambdaUrlButton", message: "RENDER" });
+  logger.write({ component: "PostCrudCommponent", message: "RENDER" });
+
+  const navigation = useNavigate();
 
   const methods = useForm<HookForm>();
-  const { handleSubmit } = methods;
+  const { handleSubmit, getValues, setValue, reset } = methods;
+
   const [posts, setPosts] = React.useState<Post[]>([]);
+
   const lambdaRequest = useLambdaRequest();
 
   const getItems = React.useCallback(async () => {
     const posts = await lambdaRequest<Post[]>({
-      url: url + "/items"
+      url: "/items",
     });
     setPosts(posts || []);
   }, [lambdaRequest]);
@@ -61,64 +59,91 @@ const PostCrudCommponent: React.FC = () => {
     getItems();
   }, [getItems]);
 
-  const onclick = async () => {
-    logger.write({ component: "PostCrudCommponent", hook: "onClick" });
+  const onReloadClick = async () => {
+    logger.write({ component: "PostCrudCommponent", hook: "onReloadClick" });
+    setPosts([]);
+    reset({});
     getItems();
   };
 
+  const prepareEdit = () => {
+    const _selectedPost = getValues("_selectedPost");
+    if (!_selectedPost) return;
+
+    setValue("_inputPost", _selectedPost);
+  };
+  const prepareAdd = () => {
+    const _selectedPost = getValues("_selectedPost");
+    setValue("_inputPost", undefined);
+    //navigation("/posts/add", { replace: true });
+  };
+  /* 特定Item取得 
   const onGetItemClick = async () => {
     logger.write({ component: "PostCrudCommponent", hook: "onGetItemClick" });
     const post = await lambdaRequest<Post>({
-      url: url + "/items/test"
+      url: "/items/test",
     });
     console.log(post?.id);
   };
+  */
 
-  const onDeleteClick = (): void => {
+  const onDeleteClick = async () => {
     logger.write({ component: "PostCrudCommponent", hook: "onDeleteClick" });
-    lambdaRequest({
+
+    const post = getValues("_selectedPost");
+    if (!post) return;
+    const result = await lambdaRequest({
       method: "DELETE",
-      url: url + "/items/test4"
+      url: `/items/${post.id}`,
     });
+    if (!result) return;
+    setPosts((state) => state.filter((value) => value.id != post.id));
   };
 
-  const onPutPostClick = async () => {
-    logger.write({ component: "PostCrudCommponent", hook: "onPutPostClick" });
+  const onSubmit: SubmitHandler<HookForm> = async (values: HookForm) => {
+    logger.write({ component: "PostCrudCommponent", hook: "submit" });
+
+    const { _inputPost } = values;
     const post = await lambdaRequest<Post>({
       method: "PUT",
-      url: url + "/items",
-      data: generatePost("test4")
+      url: "/items",
+      data: generatePost(_inputPost),
     });
     if (!post) return;
 
-    setPosts((state) => [...state, post]);
+    setPosts((state) => {
+      if (values._inputPost?.id && state.every((item) => item.id !== post.id)) {
+        return [post, ...state];
+      }
+      return state.map((item) => (item.id === post.id ? post : item));
+    });
   };
 
-  const onSubmit = React.useCallback(() => {
-    console.log("onSubmit");
-  }, []);
-  const onAddPostClick = React.useCallback(async () => {
-    await handleSubmit(onSubmit, (errors, e) => console.log("errors", errors));
-    console.log("ADD");
-    logger.write({ component: "PostCrudCommponent", hook: "onAddPostClick" });
-    // navigation("/post", { replace: true });
-  }, [handleSubmit, logger, onSubmit]);
   return (
     <>
       <FormProvider {...methods}>
         <div>
-          <MuiButton size="small" variant="outlined" onClick={onclick}>
+          <MuiButton size="small" variant="outlined" onClick={onReloadClick}>
             items再取得
           </MuiButton>
-          <MuiButton size="small" variant="outlined" onClick={onPutPostClick}>
-            put
-          </MuiButton>
+
           <Box mt={1} sx={{ display: "flex", justifyContent: "right" }}>
-            <AddPostButton onOk={onAddPostClick} />
-            <TargetableButton onClick={onGetItemClick}>
-              get item
+            <OpenEditorDialogButton
+              prepareOpen={prepareAdd}
+              onSubmit={onSubmit}
+            >
+              Add post
+            </OpenEditorDialogButton>
+            <OpenEditorDialogButton
+              prepareOpen={prepareEdit}
+              onSubmit={onSubmit}
+              component={TargetableButton}
+            >
+              edit
+            </OpenEditorDialogButton>
+            <TargetableButton onClick={onDeleteClick} color="warning">
+              delete
             </TargetableButton>
-            <TargetableButton onClick={onDeleteClick}>delete</TargetableButton>
           </Box>
         </div>
         <PostTable posts={posts} />

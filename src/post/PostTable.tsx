@@ -6,56 +6,54 @@ import {
   GridValueGetterParams,
   GridSelectionModel,
   GridRowId,
-  GRID_CHECKBOX_SELECTION_COL_DEF
+  GRID_CHECKBOX_SELECTION_COL_DEF,
 } from "@mui/x-data-grid";
 
 const columns: GridColDef[] = [
   {
     ...GRID_CHECKBOX_SELECTION_COL_DEF,
-    renderHeader: () => "Target"
+    renderHeader: () => "Target",
   },
-  { field: "id", headerName: "ID", width: 70 },
+  { field: "id", headerName: "ID", width: 110 },
   { field: "title", headerName: "Title", width: 130 },
   { field: "author", headerName: "Author", width: 130 },
   {
     field: "content",
-    headerName: "Age",
-    type: "number",
-    width: 90
+    headerName: "Content",
+    //type: "number",
+    width: 90,
   },
   {
     field: "test",
-    headerName: "Full name",
+    headerName: "Combine test",
     description: "This column has a value getter and is not sortable.",
     sortable: false,
     width: 160,
     valueGetter: (params: GridValueGetterParams) =>
-      `${params.row._type || ""} ${params.row.title || ""}`
-  }
+      `${params.row.title || ""} ${params.row.author || ""}`,
+  },
 ];
 
 const PostTableCommponent: React.FC<{ posts: Post[] }> = ({ posts }) => {
   console.log("PostTableCommponent");
 
-  const { setValue } = useFormContext<HookForm>();
+  const { setValue, watch } = useFormContext<HookForm>();
   const [selection, setSelectionModel] = React.useState<GridSelectionModel>([]);
 
   const onSelectionModelChange = (newSelection: GridSelectionModel) => {
-    console.log("selectionModel", newSelection.toString());
-    setSelectionModel((state) => {
-      console.log("1");
+    setSelectionModel((state): GridSelectionModel => {
       if (newSelection.length === 0) {
-        console.log("2");
         return [];
-      } else if (
-        state.length < newSelection.length &&
-        newSelection.length - state.length > 1
-      ) {
-        console.log("3");
-        return [newSelection.shift()];
+      } else {
+        if (
+          state.length < newSelection.length &&
+          newSelection.length - state.length > 1
+        ) {
+          return [newSelection[0]];
+        } else {
+          return [newSelection[newSelection.length - 1]];
+        }
       }
-      console.log("4");
-      return [newSelection.pop()];
     });
   };
 
@@ -68,9 +66,28 @@ const PostTableCommponent: React.FC<{ posts: Post[] }> = ({ posts }) => {
     }
   }, [posts, selection, setValue]);
 
+  React.useEffect(() => {
+    const subscription = watch((value, { name, type }) => {
+      if (type === "change") return;
+
+      if (name === "_selectedPost" || !name) {
+        const selectedId = selection.length > 0 ? selection[0] : undefined;
+        if (selectedId === value?._selectedPost?.id) return;
+
+        // 外部で change event以外で値が更新された場合、Gridに反映する
+        if (value?._selectedPost?.id) {
+          setSelectionModel([value._selectedPost.id]);
+        } else {
+          setSelectionModel([]);
+        }
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [selection, watch]);
+
   return (
     <>
-      <div style={{ height: 260, width: "100%" }}>
+      <div style={{ height: 277, width: "100%" }}>
         <DataGrid
           rows={posts}
           columns={columns}

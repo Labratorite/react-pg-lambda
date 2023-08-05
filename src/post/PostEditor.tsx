@@ -1,17 +1,16 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
-import { DateTime } from "luxon";
 import {
   useFormContext,
   Controller,
-  UseControllerProps
+  FieldPath,
+  SubmitHandler,
+  UseControllerProps,
 } from "react-hook-form";
 import { ErrorMessage } from "@hookform/error-message";
-import styled from "@emotion/styled";
-import Button from "@mui/material/Button";
+import Button, { ButtonProps } from "@mui/material/Button";
+import TargetableButton from "./TargetableButton";
 
 import { useLogger } from "src/utils/logger";
-import useLambdaRequest from "src/utils/LambdaRequest";
 import {
   Box,
   Container,
@@ -19,78 +18,73 @@ import {
   DialogActions,
   DialogContent,
   DialogProps,
-  DialogTitle
+  DialogTitle,
+  Typography,
 } from "@mui/material";
 import TextField, { TextFieldProps } from "@mui/material/TextField";
 import Grid from "@mui/material/Unstable_Grid2"; // Grid version 2
-import InvalidMessage from "../utils/InvalidMessage";
+import { styled } from "@mui/material/styles";
+// import InvalidMessage from "../utils/InvalidMessage";
 
-const generatePost = (id: string): Post => {
-  return {
-    id: DateTime.local().toMillis().toString(),
-    _type: "post",
-    parent_id: "post",
-    title: "title_" + id,
-    author: "nanashi",
-    content: "honn"
-  };
+const ErrorTypography = styled(Typography)(({ theme }) => ({
+  color: theme.palette.error.main,
+}));
+
+type PostTextFieldProps = TextFieldProps & {
+  name: keyof Post; //HookForm["_inputPost"];
+  rules?: UseControllerProps["rules"];
 };
 
-const PostText = (
-  props: TextFieldProps & {
-    name: keyof Post;
-    rules?: UseControllerProps["rules"];
-  }
-): JSX.Element | null => {
+/**
+ * TextField
+ */
+const PostText: React.FC<PostTextFieldProps> = (props) => {
   const { children, name, rules, ...rest } = props;
   const { control } = useFormContext<HookForm>();
+  const formName: FieldPath<HookForm> = `_inputPost.${name}`;
 
-  const logger = useLogger();
-  logger.write({ component: `PostText${name}`, message: "RENDER" });
   return (
     <Controller
       control={control}
       name={`_inputPost.${name}`}
       rules={rules}
-      render={({ field, fieldState, formState: { errors } }) => (
-        <>
-          <TextField required size="small" fullWidth {...rest} {...field}>
-            {children}
-          </TextField>
-          <ErrorMessage errors={errors} name={name} />
-        </>
-      )}
+      render={({ field, fieldState, formState: { errors } }) => {
+        return (
+          <>
+            <TextField required size="small" fullWidth {...rest} {...field}>
+              {children}
+            </TextField>
+            <ErrorMessage
+              errors={errors}
+              name={`_inputPost.${name}`}
+              render={({ message }) => {
+                return (
+                  <ErrorTypography variant="caption">{message}</ErrorTypography>
+                );
+              }}
+            />
+          </>
+        );
+      }}
     />
   );
 };
 
-const PostEditor: React.FC = () => {
+export const PostEditor: React.FC = () => {
   const logger = useLogger();
-  console.log("PostEditor");
   logger.write({ component: "PostEditor", message: "RENDER" });
 
   const { control } = useFormContext<HookForm>();
-  const lambdaRequest = useLambdaRequest();
-
-  const onPutPostClick = async () => {
-    logger.write({ component: "PostCrudCommponent", hook: "onPutPostClick" });
-    const post = await lambdaRequest<Post>({
-      method: "PUT",
-      //url: url + "/items",
-      data: generatePost("test4")
-    });
-    if (!post) return;
-
-    //setPosts((state) => [...state, post]);
-  };
-
   return (
     <Container maxWidth="md">
       <Grid container spacing={2} mt={1}>
         <Grid xs={12} sm={6} md={8}>
           <PostText
             required
-            rules={{ required: true }}
+            rules={{
+              required: "This is required.",
+              maxLength: { value: 20, message: "20桁まで" },
+            }}
             label="title"
             name="title"
           />
@@ -98,7 +92,10 @@ const PostEditor: React.FC = () => {
         <Grid xs={12} sm={6} md={4}>
           <PostText
             required
-            rules={{ required: true }}
+            rules={{
+              required: "This is required.",
+              maxLength: { value: 20, message: "20桁まで" },
+            }}
             label="name"
             name="author"
           />
@@ -106,13 +103,15 @@ const PostEditor: React.FC = () => {
         <Grid xs={12}>
           <PostText
             required
-            rules={{ required: true }}
-            label="title"
+            rules={{
+              required: "This is required.",
+              maxLength: { value: 30, message: "30桁まで" },
+            }}
+            label="content"
             name="content"
             multiline
             maxRows={3}
           />
-          <InvalidMessage name="content" control={control} />
         </Grid>
       </Grid>
     </Container>
@@ -121,25 +120,53 @@ const PostEditor: React.FC = () => {
 
 export type PostEditorDialogAction = {
   onClose?: React.Dispatch<void>;
-  onOk?: React.Dispatch<void>;
+  onSubmit?: (values: HookForm) => SubmitHandler<HookForm>;
 };
 
 export const PostEditorDialog: React.FC<
-  DialogProps & PostEditorDialogAction
-> = ({ children, onOk, ...rest }) => {
+  Omit<DialogProps, "onClose" | "onSubmit" | "onClick"> & PostEditorDialogAction
+> = ({ children, onClose, onSubmit, ...rest }) => {
   const logger = useLogger();
   logger.write({ component: "PostEditorDialog", hook: "RENDER" });
+
+  const { handleSubmit, trigger } = useFormContext<HookForm>();
+  // const lambdaRequest = useLambdaRequest();
+
+  const onCancel = () => {
+    logger.write({ component: "PostEditorDialog", hook: "onCancel" });
+    onClose && onClose();
+  };
+
+  const onOk = async () => {
+    const valid = await trigger();
+    if (!valid) {
+      logger.write({ component: "PostEditorDialog", hook: "validation" });
+      return;
+    }
+    if (!onSubmit) return;
+
+    logger.write({ component: "PostEditorDialog", hook: "onOk" });
+    handleSubmit(onSubmit, (errors) => {
+      logger.write({
+        component: "PostEditorDialog",
+        hook: "error",
+        context: errors,
+      });
+    })();
+    onClose && onClose();
+  };
+
   return (
-    <Dialog {...rest}>
+    <Dialog {...rest} onClose={onCancel}>
       <DialogTitle>Post</DialogTitle>
       <DialogContent>
         <PostEditor />
       </DialogContent>
       <DialogActions>
-        <Button size="small" onClick={() => onOk && onOk()}>
+        <Button size="small" onClick={onOk}>
           OK
         </Button>
-        <Button size="small" onClick={() => rest.onClose && rest.onClose()}>
+        <Button size="small" onClick={onCancel}>
           cancel
         </Button>
       </DialogActions>
@@ -148,40 +175,52 @@ export const PostEditorDialog: React.FC<
 };
 
 export const usePostEditorDialog = (params: PostEditorDialogAction) => {
-  const { onClose, ...rest } = params;
+  const { onClose, onSubmit, ...rest } = params;
   const [open, setOpen] = React.useState(false);
-  const handleClose = () => {
+  const handleClose = React.useCallback(() => {
     onClose && onClose();
     setOpen(false);
-  };
+  }, [onClose]);
 
-  React.useEffect(() => {
-    console.log("open", open);
-  }, [open]);
-
-  return {
-    // open,
-    setOpen,
-    element: <PostEditorDialog open={open} onClose={handleClose} {...rest} />
-  };
+  return React.useMemo(() => {
+    const element = (
+      <PostEditorDialog
+        open={open}
+        onSubmit={onSubmit}
+        onClose={handleClose}
+        {...rest}
+      />
+    );
+    return {
+      setOpen,
+      element,
+    };
+  }, [rest, open, handleClose, onSubmit]);
 };
 
-const AddPostButton: React.FC<PostEditorDialogAction> = (params) => {
-  const navigation = useNavigate();
-  const { setOpen, element } = usePostEditorDialog(params);
-  const onAddPostClick = () => {
-    // navigation("/post", { replace: true });
+type OpenEditorDialogButtonProps = {
+  prepareOpen?: () => void;
+  component?: React.ElementType;
+} & PostEditorDialogAction;
+
+const OpenEditorDialogButton: FCC<OpenEditorDialogButtonProps> = (params) => {
+  const { children, prepareOpen, component, ...rest } = params;
+  const ButtonElement = component || Button;
+
+  const { setOpen, element } = usePostEditorDialog(rest);
+  const handleClick = () => {
+    prepareOpen && prepareOpen();
     setOpen(true);
   };
 
   return (
     <>
-      <Button size="small" variant="outlined" onClick={onAddPostClick}>
-        Add post
-      </Button>
+      <ButtonElement size="small" variant="outlined" onClick={handleClick}>
+        {children}
+      </ButtonElement>
       {element}
     </>
   );
 };
 
-export default AddPostButton;
+export default OpenEditorDialogButton;

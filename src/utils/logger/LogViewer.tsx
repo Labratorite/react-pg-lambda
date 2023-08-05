@@ -4,7 +4,7 @@ export type LogState = {
   component: string;
   message?: string;
   hook?: string;
-  context?: unknown[] | unknown;
+  context?: any[] | any;
 };
 
 const LogItem: React.FC<LogState> = ({ component, hook, message, context }) => {
