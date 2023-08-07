@@ -1,3 +1,4 @@
+import React from "react";
 import styled from "@emotion/styled";
 
 export type LogState = {
@@ -59,14 +60,23 @@ const LogList = styled("ol")`
 export const LogViewer: React.FC<{
   logs: LogState[];
 }> = ({ logs }) => {
+  const scrollBottomRef = React.useRef<HTMLElement>(null);
+
+  React.useLayoutEffect(() => {
+    console.log("LogViewer", scrollBottomRef?.current);
+    scrollBottomRef?.current?.scrollIntoView();
+  }, [logs.length]);
   return (
-    <LogList>
-      {logs.map((log, index) => (
-        <li key={index}>
-          <LogItem {...log} />
-        </li>
-      ))}
-    </LogList>
+    <div style={{ overflowY: "auto", maxHeight: "30vh", width: "100%" }}>
+      <LogList>
+        {logs.map((log, index) => (
+          <li key={index}>
+            <LogItem {...log} />
+          </li>
+        ))}
+      </LogList>
+      <span ref={scrollBottomRef} />
+    </div>
   );
 };
 

@@ -7,8 +7,7 @@ import {
   UseControllerProps,
 } from "react-hook-form";
 import { ErrorMessage } from "@hookform/error-message";
-import Button, { ButtonProps } from "@mui/material/Button";
-import TargetableButton from "./TargetableButton";
+import Button from "@mui/material/Button";
 
 import { useLogger } from "src/utils/logger";
 import {

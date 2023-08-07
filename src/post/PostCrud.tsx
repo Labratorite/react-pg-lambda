@@ -4,9 +4,10 @@ import { FormProvider, SubmitHandler, useForm } from "react-hook-form";
 
 import styled from "@emotion/styled";
 import { DateTime } from "luxon";
-import MuiButton, { ButtonProps } from "@mui/material/Button";
+import MuiButton from "@mui/material/Button";
 import { Box } from "@mui/material";
 import { useLogger } from "src/utils/logger";
+import { useProgress } from "src/utils/Progress";
 import useLambdaRequest from "src/utils/LambdaRequest";
 import PostTable from "./PostTable";
 import TargetableButton from "./TargetableButton";
@@ -36,23 +37,25 @@ const ActionButton = styled.div((props) => {
 
 const PostCrudCommponent: React.FC = () => {
   const logger = useLogger();
-  console.log("PostCrudCommponent");
   logger.write({ component: "PostCrudCommponent", message: "RENDER" });
 
   const navigation = useNavigate();
+  const { progress } = useProgress();
 
   const methods = useForm<HookForm>();
-  const { handleSubmit, getValues, setValue, reset } = methods;
+  const { getValues, setValue, reset } = methods;
 
   const [posts, setPosts] = React.useState<Post[]>([]);
 
   const lambdaRequest = useLambdaRequest();
 
   const getItems = React.useCallback(async () => {
+    progress(true);
     const posts = await lambdaRequest<Post[]>({
       url: "/items",
     });
     setPosts(posts || []);
+    progress(false);
   }, [lambdaRequest]);
 
   React.useEffect(() => {
@@ -92,16 +95,20 @@ const PostCrudCommponent: React.FC = () => {
 
     const post = getValues("_selectedPost");
     if (!post) return;
+
+    progress(true);
     const result = await lambdaRequest({
       method: "DELETE",
       url: `/items/${post.id}`,
     });
+    progress(false);
     if (!result) return;
     setPosts((state) => state.filter((value) => value.id != post.id));
   };
 
   const onSubmit: SubmitHandler<HookForm> = async (values: HookForm) => {
     logger.write({ component: "PostCrudCommponent", hook: "submit" });
+    progress(true);
 
     const { _inputPost } = values;
     const post = await lambdaRequest<Post>({
@@ -112,11 +119,15 @@ const PostCrudCommponent: React.FC = () => {
     if (!post) return;
 
     setPosts((state) => {
-      if (values._inputPost?.id && state.every((item) => item.id !== post.id)) {
+      if (
+        !values._inputPost?.id &&
+        state.every((item) => item.id !== post.id)
+      ) {
         return [post, ...state];
       }
       return state.map((item) => (item.id === post.id ? post : item));
     });
+    progress(false);
   };
 
   return (
@@ -128,6 +139,12 @@ const PostCrudCommponent: React.FC = () => {
           </MuiButton>
 
           <Box mt={1} sx={{ display: "flex", justifyContent: "right" }}>
+            <MuiButton
+              onClick={() => navigation("/posts/add", { replace: true })}
+              size="small"
+            >
+              Add post(change route)
+            </MuiButton>
             <OpenEditorDialogButton
               prepareOpen={prepareAdd}
               onSubmit={onSubmit}

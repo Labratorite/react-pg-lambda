@@ -13,11 +13,10 @@ import Card from "@mui/material/Card";
 import CardActions from "@mui/material/CardActions";
 import CardContent from "@mui/material/CardContent";
 import CardHeader from "@mui/material/CardHeader";
-import TextField, { TextFieldProps } from "@mui/material/TextField";
 //import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
-import { styled } from "@mui/material/styles";
 // import InvalidMessage from "../utils/InvalidMessage";
 import { useLogger } from "src/utils/logger";
+import { useProgress } from "src/utils/Progress";
 import { generatePost } from "./PostCrud";
 import { PostEditor } from "./PostEditor";
 import useLambdaRequest from "src/utils/LambdaRequest";
@@ -81,11 +80,16 @@ export const PostAddPage: React.FC<PostAddAction> = ({ onSubmit }) => {
 
 const PostAdd: React.FC = () => {
   const logger = useLogger();
+  const { progress } = useProgress();
   const navigation = useNavigate();
   const lambdaRequest = useLambdaRequest();
 
   const methods = useForm<HookForm>();
   const { handleSubmit, getValues } = methods;
+
+  React.useEffect(() => {
+    setTimeout(() => progress(false), 200);
+  }, []);
 
   const onSubmit: SubmitHandler<HookForm> = async (values: HookForm) => {
     console.log("onSubmit");
