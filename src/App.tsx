@@ -2,32 +2,32 @@ import React from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { LoggerProvider } from "./utils/logger";
+import { ProgressProvider, useProgress } from "./utils/Progress";
 import PostCrud from "./post/PostCrud";
+import PostAdd from "./post/PostAdd";
 import "./styles.css";
 
-const PlaygroundBase = React.memo(() => {
-  //const logger = useLogger();
-  //logger.write({ component: "PlaygroundBase", message: "RENDER" });
+const Routing = React.memo(() => {
   return (
     <BrowserRouter>
       <Routes>
-        <Route index element={<PostCrud />} />
-        <Route path="/post" element={<PostCrud />}>
-          <Route path=":postId" element={<PostCrud />} />
+        <Route path="/" element={<ProgressProvider />}>
+          <Route index element={<Navigate to="/posts" />} />
+          <Route path="posts" element={<PostCrud />} />
+          <Route path="posts/add" element={<PostAdd />} />
+          <Route path="*" element={<div>Not Found</div>} />
         </Route>
-        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </BrowserRouter>
   );
 });
 
 export default function App() {
-  // logger.info("App", "RE-RENDER");
   console.log("App");
   return (
     <div className="App">
       <LoggerProvider>
-        <PlaygroundBase />
+        <Routing />
       </LoggerProvider>
     </div>
   );

@@ -2,8 +2,11 @@ import React from "react";
 import axios, { AxiosRequestConfig } from "axios";
 import { useLogger } from "./logger";
 
+export const apiUrl =
+  "https://azyxtmgvfb.execute-api.ap-northeast-1.amazonaws.com";
+
 const headers = {
-  "Content-Type": "application/json"
+  "Content-Type": "application/json",
 };
 
 type LambdaRequest = <R, D = any>(
@@ -13,27 +16,29 @@ type LambdaRequest = <R, D = any>(
 const useLambdaRequest = (): LambdaRequest => {
   const logger = useLogger();
   const request = async <R, D = any>(config: AxiosRequestConfig<D>) => {
+    const { url, ...restConfig } = config;
     try {
       const response = await axios
         .request<R>({
           headers,
-          ...config
+          url: apiUrl + url,
+          ...restConfig,
         })
         .then((res) => res.data);
 
       logger.write({
         component: "PostCrudCommponent",
         message: "response",
-        context: response
+        context: response,
       });
       return response;
     } catch (error) {
-      console.log("error", error);
       logger.write({
         component: "PostCrudCommponent",
         hook: "catch",
-        context: error
+        context: error,
       });
+      console.log("error", error);
     }
   };
   return React.useCallback(request, [logger]);

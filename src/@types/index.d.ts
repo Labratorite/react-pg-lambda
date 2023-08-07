@@ -13,3 +13,5 @@ type HookForm = {
   _selectedPost?: Post;
   _inputPost?: Post;
 };
+
+type FCC<P = {}> = React.FC<React.PropsWithChildren<P>>;
